@@ -1,0 +1,60 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-predai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-predai_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-predai}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-predai} -d ${POSTGRES_DB:-predai}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  ml-service:
+    build:
+      context: ./apps/ml-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./apps/ml-service/models:/app/models
+      - ./apps/ml-service/data:/app/data
+    environment:
+      MODEL_DIR: /app/models
+      DATA_DIR: /app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - '4000:4000'
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-predai}:${POSTGRES_PASSWORD:-predai_dev_password}@postgres:5432/${POSTGRES_DB:-predai}
+      ML_SERVICE_URL: http://ml-service:8000
+      JWT_SECRET: ${JWT_SECRET}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ml-service:
+        condition: service_started
+
+volumes:
+  postgres-data:

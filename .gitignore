@@ -1,0 +1,16 @@
+node_modules/
+.next/
+dist/
+.env
+*.env.local
+.turbo/
+
+# ML artifacts
+apps/ml-service/models/*.joblib
+apps/ml-service/data/*.csv
+
+# Postgres data
+postgres-data/
+
+# pnpm
+.pnpm-store/
